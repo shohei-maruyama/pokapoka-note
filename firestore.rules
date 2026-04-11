@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // users/{uid} は本人のみ読み書き可
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // families/{familyId} 配下はメンバーのみ
+    match /families/{familyId} {
+      function isMember() {
+        return request.auth != null &&
+          request.auth.uid in resource.data.members;
+      }
+      function isMemberForCreate() {
+        return request.auth != null &&
+          request.auth.uid in request.resource.data.members;
+      }
+
+      // 家族ドキュメント自体
+      allow read: if isMember();
+      allow create: if isMemberForCreate();
+      allow update: if isMember();
+      allow delete: if false; // 削除は禁止
+
+      // records サブコレクション
+      match /records/{recordId} {
+        allow read, write: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/families/$(familyId)).data.members;
+      }
+
+      // babies サブコレクション
+      match /babies/{babyId} {
+        allow read, write: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/families/$(familyId)).data.members;
+      }
+
+      // milestones サブコレクション
+      match /milestones/{milestoneId} {
+        allow read, write: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/families/$(familyId)).data.members;
+      }
+
+      // growths サブコレクション
+      match /growths/{growthId} {
+        allow read, write: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/families/$(familyId)).data.members;
+      }
+
+      // vaccines サブコレクション
+      match /vaccines/{vaccineId} {
+        allow read, write: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/families/$(familyId)).data.members;
+      }
+
+      // invites サブコレクション（招待リンク）
+      match /invites/{inviteId} {
+        // 作成はメンバーのみ
+        allow create: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/families/$(familyId)).data.members;
+        // 読み取りは認証済みなら誰でも（招待URLを開いた人）
+        allow read: if request.auth != null;
+        // 更新・削除はメンバーのみ
+        allow update, delete: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/families/$(familyId)).data.members;
+      }
+    }
+  }
+}
